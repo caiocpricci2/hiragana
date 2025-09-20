@@ -162,6 +162,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .flashcard-char {
@@ -246,6 +247,15 @@ body {
     letter-spacing: 2px;
 }
 
+.word-translation {
+    font-size: 18px;
+    color: #666;
+    margin-top: 10px;
+    font-weight: normal;
+    letter-spacing: normal;
+    line-height: 1.3;
+}
+
 .selection-controls {
     display: flex;
     justify-content: center;
@@ -299,4 +309,200 @@ body {
 .btn-small {
     padding: 8px 12px;
     font-size: 14px;
+}
+
+/* Multiple Choice Styles */
+.multiple-choice-container {
+    width: 100%;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 4px;
+    background-color: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007AFF 0%, #0056b3 100%);
+    width: 0%;
+    transition: width 0.8s ease-out;
+    border-radius: 2px;
+}
+
+.choices-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 20px 0;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.choice-btn {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.choice-btn:hover:not(:disabled) {
+    border-color: #007AFF;
+    background-color: #f8f9fa;
+}
+
+.choice-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.choice-btn.correct {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.choice-btn.incorrect {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.choice-btn.disabled-wrong {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.choice-btn.disabled-wrong:hover {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.choice-feedback {
+    margin: 15px 0;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.feedback {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.correct-feedback {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.incorrect-feedback {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.choice-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* iPhone SE specific optimizations */
+@media (max-width: 375px) {
+    .container {
+        padding: 10px;
+        padding-bottom: 90px;
+    }
+
+    .flashcard {
+        padding: 20px 15px;
+        margin: 20px auto;
+        min-height: 250px;
+    }
+
+    .flashcard-char {
+        font-size: 56px;
+        margin-bottom: 15px;
+    }
+
+    .choices-grid {
+        gap: 6px;
+        margin: 15px 0;
+        max-width: 280px;
+    }
+
+    .choice-btn {
+        padding: 10px 6px;
+        font-size: 13px;
+        min-height: 40px;
+    }
+
+    .flashcard-buttons {
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    .choice-buttons {
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .feedback {
+        font-size: 14px;
+        padding: 6px 12px;
+    }
+
+    .word-translation {
+        font-size: 16px;
+        margin-top: 8px;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 320px) {
+    .flashcard-char {
+        font-size: 48px;
+    }
+
+    .choices-grid {
+        max-width: 260px;
+        gap: 4px;
+    }
+
+    .choice-btn {
+        padding: 8px 4px;
+        font-size: 12px;
+        min-height: 36px;
+    }
+
+    .word-translation {
+        font-size: 14px;
+        margin-top: 6px;
+    }
 }

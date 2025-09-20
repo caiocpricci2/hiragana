@@ -108,13 +108,249 @@ let randomSeed = 50;
 let shuffledLetters = [];
 let shuffledWords = [];
 
+// Reusable FlashcardManager class
+class FlashcardManager {
+    constructor(config) {
+        this.containerId = config.containerId;
+        this.type = config.type; // 'letter' or 'word'
+        this.currentIndex = 0;
+        this.shuffledItems = [];
+        this.getItemsFunction = config.getItemsFunction;
+        this.noItemsMessage = config.noItemsMessage;
+        this.displayConfig = config.displayConfig;
+        this.wrongSelections = new Set(); // Track wrong selections for current card
+    }
+
+    updateItems(seed) {
+        const availableItems = this.getItemsFunction();
+        this.shuffledItems = shuffleArray(availableItems, seed + (this.type === 'word' ? 1000 : 0));
+        this.currentIndex = 0;
+    }
+
+    getCurrentItem() {
+        if (this.shuffledItems.length === 0) return null;
+        if (this.currentIndex >= this.shuffledItems.length) {
+            this.currentIndex = 0;
+        }
+        return this.shuffledItems[this.currentIndex];
+    }
+
+    renderFlashcard() {
+        const container = document.getElementById(this.containerId);
+
+        if (this.shuffledItems.length === 0) {
+            container.innerHTML = `<div class="no-letters-message">${this.noItemsMessage}</div>`;
+            return;
+        }
+
+        const item = this.getCurrentItem();
+        if (!item) return;
+
+        // Clear wrong selections when showing a new card
+        this.wrongSelections.clear();
+        showingAnswer = false;
+
+        const displayText = this.displayConfig.getDisplayText(item);
+        const answerText = this.displayConfig.getAnswerText(item);
+        const displayClass = this.displayConfig.displayClass;
+
+        const showAnswerFn = this.type === 'letter' ? 'showLetterAnswer' : 'showWordAnswer';
+        const showMultipleChoiceFn = this.type === 'letter' ? 'showMultipleChoice' : 'showWordMultipleChoice';
+        const nextFn = this.type === 'letter' ? 'nextLetter' : 'nextWord';
+
+        container.innerHTML = `
+            <div class="${displayClass}">${displayText}</div>
+            <div class="flashcard-romaji" id="${this.type}-answer">${answerText}</div>
+            <div class="flashcard-buttons">
+                <button class="btn btn-primary" onclick="${showAnswerFn}()">Show Answer</button>
+                <button class="btn btn-secondary" onclick="${showMultipleChoiceFn}()">Multiple Choice</button>
+                <button class="btn btn-secondary" onclick="${nextFn}()">Next</button>
+            </div>
+        `;
+    }
+
+    showAnswer() {
+        document.getElementById(`${this.type}-answer`).classList.add('show');
+        showingAnswer = true;
+    }
+
+    showMultipleChoice() {
+        const container = document.getElementById(this.containerId);
+        const currentItem = this.getCurrentItem();
+        if (!currentItem) return;
+
+        const choices = this.generateMultipleChoices(currentItem);
+        const correctAnswer = this.displayConfig.getCorrectAnswer(currentItem);
+
+        const selectChoiceFn = this.type === 'letter' ? 'selectChoice' : 'selectWordChoice';
+
+        let choicesHTML = '';
+        choices.forEach((choice, index) => {
+            const isWrongChoice = this.wrongSelections.has(choice);
+            const disabledAttr = isWrongChoice ? 'disabled' : '';
+            const disabledClass = isWrongChoice ? 'disabled-wrong' : '';
+
+            choicesHTML += `
+                <button class="choice-btn ${disabledClass}" ${disabledAttr} onclick="${selectChoiceFn}('${choice.replace(/'/g, "\\'")}', '${correctAnswer.replace(/'/g, "\\'")}', ${index})" id="choice-${index}">
+                    ${choice}
+                </button>
+            `;
+        });
+
+        const displayText = this.displayConfig.getDisplayText(currentItem);
+        const displayClass = this.displayConfig.displayClass;
+
+        container.innerHTML = `
+            <div class="progress-bar-container" id="progress-container" style="display: none;">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="${displayClass}">${displayText}</div>
+            <div class="multiple-choice-container">
+                <div class="choices-grid">
+                    ${choicesHTML}
+                </div>
+                <div class="choice-feedback" id="choice-feedback"></div>
+                <div class="choice-buttons">
+                    <button class="btn btn-secondary" onclick="${this.type === 'letter' ? 'updateLetterFlashcard' : 'updateWordFlashcard'}()" id="back-btn">Back</button>
+                </div>
+            </div>
+        `;
+    }
+
+    generateMultipleChoices(correctItem) {
+        const allItems = this.getItemsFunction();
+        const wrongChoices = [];
+        const correctAnswer = this.displayConfig.getCorrectAnswer(correctItem);
+
+        // Get 9 random wrong answers
+        while (wrongChoices.length < 9 && wrongChoices.length < allItems.length - 1) {
+            const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+            const randomAnswer = this.displayConfig.getCorrectAnswer(randomItem);
+            if (randomAnswer !== correctAnswer && !wrongChoices.includes(randomAnswer)) {
+                wrongChoices.push(randomAnswer);
+            }
+        }
+
+        // Add the correct answer
+        const allChoices = [...wrongChoices, correctAnswer];
+
+        // Shuffle the choices
+        return shuffleArray(allChoices, Math.random() * 1000);
+    }
+
+    selectChoice(selectedChoice, correctAnswer, choiceIndex) {
+        const feedbackDiv = document.getElementById('choice-feedback');
+        const choiceBtn = document.getElementById(`choice-${choiceIndex}`);
+
+        if (selectedChoice === correctAnswer) {
+            // Correct answer - disable all buttons
+            document.querySelectorAll('.choice-btn').forEach(btn => {
+                btn.disabled = true;
+            });
+
+            choiceBtn.classList.add('correct');
+            feedbackDiv.innerHTML = '<div class="feedback correct-feedback">✓ Correct!</div>';
+
+            // Show and animate progress bar
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+
+            progressContainer.style.display = 'block';
+
+            // Small delay to ensure the progress bar is visible before animation
+            setTimeout(() => {
+                progressBar.style.width = '100%';
+            }, 50);
+
+            // Auto-advance to next card after progress bar completes
+            setTimeout(() => {
+                this.transitionToNext();
+            }, 800);
+        } else {
+            // Wrong answer - add to wrong selections set and disable permanently
+            this.wrongSelections.add(selectedChoice);
+            choiceBtn.disabled = true;
+            choiceBtn.classList.add('incorrect', 'disabled-wrong');
+            feedbackDiv.innerHTML = '<div class="feedback incorrect-feedback">✗ Try again!</div>';
+
+            // Clear feedback after short delay but keep button disabled
+            setTimeout(() => {
+                feedbackDiv.innerHTML = '';
+            }, 400);
+        }
+    }
+
+    transitionToNext() {
+        const container = document.getElementById(this.containerId);
+
+        // Add fade out effect
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-10px)';
+
+        setTimeout(() => {
+            // Move to next card
+            this.currentIndex = (this.currentIndex + 1) % this.shuffledItems.length;
+            this.renderFlashcard();
+
+            // Add fade in effect
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(10px)';
+
+            setTimeout(() => {
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 50);
+        }, 300);
+    }
+
+    next() {
+        this.transitionToNext();
+    }
+}
+
+// Create manager instances
+let letterManager;
+let wordManager;
+
 // Initialize app
 function init() {
     loadSelectedLetters();
-    loadSeed();
+    // Generate random seed on app open
+    randomSeed = Math.floor(Math.random() * 999) + 1;
+    document.getElementById('seed-input').value = randomSeed;
+    saveSeed();
+
     if (selectedLetters.size === 0) {
         selectFirst15Letters();
     }
+
+    // Initialize flashcard managers
+    letterManager = new FlashcardManager({
+        containerId: 'letter-flashcard',
+        type: 'letter',
+        getItemsFunction: getAvailableLetters,
+        noItemsMessage: 'Select some letters in the Configuration tab to start practicing!',
+        displayConfig: {
+            displayClass: 'flashcard-char',
+            getDisplayText: (item) => item.hiragana,
+            getAnswerText: (item) => item.romaji,
+            getCorrectAnswer: (item) => item.romaji
+        }
+    });
+
+    wordManager = new FlashcardManager({
+        containerId: 'word-flashcard',
+        type: 'word',
+        getItemsFunction: getAvailableWords,
+        noItemsMessage: 'Select some letters in the Configuration tab to start practicing words!',
+        displayConfig: {
+            displayClass: 'word-reading',
+            getDisplayText: (item) => `${item.hiragana}<div class="word-translation">${item.meaning}</div>`,
+            getAnswerText: (item) => `${item.romaji} (${item.meaning})`,
+            getCorrectAnswer: (item) => item.romaji
+        }
+    });
+
     renderHiraganaGroups();
     updateFlashcards();
 }
@@ -321,69 +557,21 @@ function clearAll() {
 
 // Flashcard functions
 function updateFlashcards() {
-    // Generate shuffled arrays based on current seed
-    const availableLetters = getAvailableLetters();
-    const availableWords = getAvailableWords();
-    
-    shuffledLetters = shuffleArray(availableLetters, randomSeed);
-    shuffledWords = shuffleArray(availableWords, randomSeed + 1000);
-    
-    // Reset indices when shuffling
-    currentLetterIndex = 0;
-    currentWordIndex = 0;
-    
-    updateLetterFlashcard();
-    updateWordFlashcard();
+    if (letterManager && wordManager) {
+        letterManager.updateItems(randomSeed);
+        wordManager.updateItems(randomSeed);
+        letterManager.renderFlashcard();
+        wordManager.renderFlashcard();
+    }
 }
 
+// Legacy wrapper functions for backward compatibility
 function updateLetterFlashcard() {
-    const container = document.getElementById('letter-flashcard');
-
-    if (shuffledLetters.length === 0) {
-        container.innerHTML = '<div class="no-letters-message">Select some letters in the Configuration tab to start practicing!</div>';
-        return;
-    }
-
-    if (currentLetterIndex >= shuffledLetters.length) {
-        currentLetterIndex = 0;
-    }
-
-    const letter = shuffledLetters[currentLetterIndex];
-    showingAnswer = false;
-
-    container.innerHTML = `
-        <div class="flashcard-char">${letter.hiragana}</div>
-        <div class="flashcard-romaji" id="letter-answer">${letter.romaji}</div>
-        <div class="flashcard-buttons">
-            <button class="btn btn-primary" onclick="showLetterAnswer()">Show Answer</button>
-            <button class="btn btn-secondary" onclick="nextLetter()">Next</button>
-        </div>
-    `;
+    if (letterManager) letterManager.renderFlashcard();
 }
 
 function updateWordFlashcard() {
-    const container = document.getElementById('word-flashcard');
-
-    if (shuffledWords.length === 0) {
-        container.innerHTML = '<div class="no-letters-message">Select some letters in the Configuration tab to start practicing words!</div>';
-        return;
-    }
-
-    if (currentWordIndex >= shuffledWords.length) {
-        currentWordIndex = 0;
-    }
-
-    const word = shuffledWords[currentWordIndex];
-    showingAnswer = false;
-
-    container.innerHTML = `
-        <div class="word-reading">${word.hiragana}</div>
-        <div class="flashcard-romaji" id="word-answer">${word.romaji} (${word.meaning})</div>
-        <div class="flashcard-buttons">
-            <button class="btn btn-primary" onclick="showWordAnswer()">Show Answer</button>
-            <button class="btn btn-secondary" onclick="nextWord()">Next</button>
-        </div>
-    `;
+    if (wordManager) wordManager.renderFlashcard();
 }
 
 function getAvailableLetters() {
@@ -404,24 +592,37 @@ function getAvailableWords() {
     });
 }
 
+// Legacy wrapper functions for backward compatibility
 function showLetterAnswer() {
-    document.getElementById('letter-answer').classList.add('show');
-    showingAnswer = true;
+    if (letterManager) letterManager.showAnswer();
 }
 
 function showWordAnswer() {
-    document.getElementById('word-answer').classList.add('show');
-    showingAnswer = true;
+    if (wordManager) wordManager.showAnswer();
 }
 
 function nextLetter() {
-    currentLetterIndex = (currentLetterIndex + 1) % shuffledLetters.length;
-    updateLetterFlashcard();
+    if (letterManager) letterManager.next();
 }
 
 function nextWord() {
-    currentWordIndex = (currentWordIndex + 1) % shuffledWords.length;
-    updateWordFlashcard();
+    if (wordManager) wordManager.next();
+}
+
+function showMultipleChoice() {
+    if (letterManager) letterManager.showMultipleChoice();
+}
+
+function showWordMultipleChoice() {
+    if (wordManager) wordManager.showMultipleChoice();
+}
+
+function selectChoice(selectedChoice, correctAnswer, choiceIndex) {
+    if (letterManager) letterManager.selectChoice(selectedChoice, correctAnswer, choiceIndex);
+}
+
+function selectWordChoice(selectedChoice, correctAnswer, choiceIndex) {
+    if (wordManager) wordManager.selectChoice(selectedChoice, correctAnswer, choiceIndex);
 }
 
 // Initialize the app when page loads
