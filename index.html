@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiragana Learning App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Letter Flashcard Screen -->
+        <div class="screen active" id="letter-screen">
+            <div id="letter-flashcard" class="flashcard">
+                <div class="no-letters-message">
+                    Select some letters in the Configuration tab to start practicing!
+                </div>
+            </div>
+        </div>
+
+        <!-- Word Flashcard Screen -->
+        <div class="screen" id="word-screen">
+            <div id="word-flashcard" class="flashcard">
+                <div class="no-letters-message">
+                    Select some letters in the Configuration tab to start practicing words!
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Screen -->
+        <div class="screen" id="config-screen">
+            <div class="config-header">
+                <h1 class="config-title">Select Hiragana Letters</h1>
+                <p class="config-subtitle">Choose the letters you want to practice</p>
+            </div>
+            
+            <div class="seed-setting">
+                <h4>Randomization Seed</h4>
+                <p>Changes the order of flashcards. Use the same seed for consistent practice order.</p>
+                <div class="seed-controls">
+                    <input type="number" class="seed-input" id="seed-input" value="50" min="1" max="999" onchange="updateSeed()">
+                    <button class="btn btn-secondary btn-small" onclick="randomizeSeed()">Random</button>
+                </div>
+            </div>
+            
+            <div class="selection-controls">
+                <button class="btn btn-secondary" onclick="selectAll()">Select All</button>
+                <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+            </div>
+
+            <div id="hiragana-groups"></div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('letter')">
+            <div class="tab-icon">あ</div>
+            <div>Letters</div>
+        </button>
+        <button class="tab" onclick="switchTab('word')">
+            <div class="tab-icon">📖</div>
+            <div>Words</div>
+        </button>
+        <button class="tab" onclick="switchTab('config')">
+            <div class="tab-icon">⚙️</div>
+            <div>Config</div>
+        </button>
+    </div>
+
+    <script src="dictionary.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
