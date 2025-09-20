@@ -1,3 +1,6 @@
+// Global debug mode variable
+let debugMode = localStorage.getItem('debugMode') === 'true' || false;
+
 // Hiragana data organized by learning order
 const hiraganaData = [
     {
@@ -150,34 +153,90 @@ class FlashcardManager {
         this.wrongSelections.clear();
         showingAnswer = false;
 
+        // Reset progress bar
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        if (progressContainer && progressBar) {
+            progressContainer.style.visibility = 'hidden';
+            progressBar.style.width = '0%';
+        }
+
         const displayText = this.displayConfig.getDisplayText(item);
         const answerText = this.displayConfig.getAnswerText(item);
         const displayClass = this.displayConfig.displayClass;
 
         const showAnswerFn = this.type === 'letter' ? 'showLetterAnswer' : 'showWordAnswer';
         const showMultipleChoiceFn = this.type === 'letter' ? 'showMultipleChoice' : 'showWordMultipleChoice';
-        const nextFn = this.type === 'letter' ? 'nextLetter' : 'nextWord';
 
         container.innerHTML = `
+            <div class="progress-bar-container" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <button class="multiple-choice-btn" onclick="${showMultipleChoiceFn}()" title="Multiple Choice"></button>
             <div class="${displayClass}">${displayText}</div>
             <div class="flashcard-romaji" id="${this.type}-answer">${answerText}</div>
-            <div class="flashcard-buttons">
-                <button class="btn btn-primary" onclick="${showAnswerFn}()">Show Answer</button>
-                <button class="btn btn-secondary" onclick="${showMultipleChoiceFn}()">Multiple Choice</button>
-                <button class="btn btn-secondary" onclick="${nextFn}()">Next</button>
-            </div>
         `;
+
+        // Set up keyboard for typing practice
+        this.setupKeyboard(item);
+
+        // Show the keyboard when rendering regular flashcard
+        keyboard.show();
+    }
+
+    setupKeyboard(item) {
+        const correctAnswer = this.displayConfig.getCorrectAnswer(item);
+
+        // Debug: log the item and correct answer
+        console.log('setupKeyboard - item:', item);
+        console.log('setupKeyboard - correctAnswer:', correctAnswer);
+
+        // Render keyboard in the global keyboard area (only if not already rendered)
+        if (!document.querySelector('.keyboard-container')) {
+            keyboard.render('global-keyboard-area');
+        }
+
+        // Set the target answer for the keyboard
+        keyboard.setTargetAnswer(correctAnswer);
+
+        // Set up callback for when correct answer is typed
+        keyboard.setOnCorrectCallback(() => {
+            // Prevent multiple callbacks
+            keyboard.setOnCorrectCallback(null);
+
+            // Show the answer
+            document.getElementById(`${this.type}-answer`).classList.add('show');
+
+            // Show success feedback on keyboard
+            keyboard.showFeedback(true);
+
+            // Use the unified progress bar and transition method
+            setTimeout(() => {
+                this.showProgressBarAndTransition();
+            }, 500);
+        });
+
+        // Optional: Show what they're typing in real-time
+        keyboard.setOnInputChangeCallback((currentInput) => {
+            // Could add visual feedback here if desired
+        });
     }
 
     showAnswer() {
         document.getElementById(`${this.type}-answer`).classList.add('show');
         showingAnswer = true;
+
+        // Use the unified progress bar and transition method
+        this.showProgressBarAndTransition();
     }
 
     showMultipleChoice() {
         const container = document.getElementById(this.containerId);
         const currentItem = this.getCurrentItem();
         if (!currentItem) return;
+
+        // Hide the keyboard when showing multiple choice
+        keyboard.hide();
 
         const choices = this.generateMultipleChoices(currentItem);
         const correctAnswer = this.displayConfig.getCorrectAnswer(currentItem);
@@ -201,7 +260,7 @@ class FlashcardManager {
         const displayClass = this.displayConfig.displayClass;
 
         container.innerHTML = `
-            <div class="progress-bar-container" id="progress-container" style="display: none;">
+            <div class="progress-bar-container" id="progress-container">
                 <div class="progress-bar" id="progress-bar"></div>
             </div>
             <div class="${displayClass}">${displayText}</div>
@@ -251,21 +310,8 @@ class FlashcardManager {
             choiceBtn.classList.add('correct');
             feedbackDiv.innerHTML = '<div class="feedback correct-feedback">✓ Correct!</div>';
 
-            // Show and animate progress bar
-            const progressContainer = document.getElementById('progress-container');
-            const progressBar = document.getElementById('progress-bar');
-
-            progressContainer.style.display = 'block';
-
-            // Small delay to ensure the progress bar is visible before animation
-            setTimeout(() => {
-                progressBar.style.width = '100%';
-            }, 50);
-
-            // Auto-advance to next card after progress bar completes
-            setTimeout(() => {
-                this.transitionToNext();
-            }, 800);
+            // Use the unified progress bar and transition method
+            this.showProgressBarAndTransition();
         } else {
             // Wrong answer - add to wrong selections set and disable permanently
             this.wrongSelections.add(selectedChoice);
@@ -278,6 +324,27 @@ class FlashcardManager {
                 feedbackDiv.innerHTML = '';
             }, 400);
         }
+    }
+
+    showProgressBarAndTransition() {
+        // Show and animate progress bar
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+
+        // Show progress bar if it exists (only in multiple choice view)
+        if (progressContainer && progressBar) {
+            progressContainer.style.visibility = 'visible';
+
+            // Small delay to ensure the progress bar is visible before animation
+            setTimeout(() => {
+                progressBar.style.width = '100%';
+            }, 50);
+        }
+
+        // Auto-advance to next card after progress bar completes
+        setTimeout(() => {
+            this.transitionToNext();
+        }, 800);
     }
 
     transitionToNext() {
@@ -319,6 +386,8 @@ function init() {
     randomSeed = Math.floor(Math.random() * 999) + 1;
     document.getElementById('seed-input').value = randomSeed;
     saveSeed();
+    // Initialize debug mode checkbox
+    document.getElementById('debug-checkbox').checked = debugMode;
 
     if (selectedLetters.size === 0) {
         selectFirst15Letters();
@@ -411,6 +480,17 @@ function randomizeSeed() {
     updateFlashcards();
 }
 
+function toggleDebugMode() {
+    const checkbox = document.getElementById('debug-checkbox');
+    debugMode = checkbox.checked;
+    localStorage.setItem('debugMode', debugMode.toString());
+
+    // Update keyboard display if it exists
+    if (window.keyboard) {
+        keyboard.updateDebugDisplay();
+    }
+}
+
 // Seeded random number generator
 function seededRandom(seed) {
     const x = Math.sin(seed) * 10000;
@@ -431,12 +511,15 @@ function shuffleArray(array, seed) {
 function switchTab(tab) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    
+
     document.getElementById(`${tab}-screen`).classList.add('active');
     event.target.classList.add('active');
-    
+
     if (tab === 'letter' || tab === 'word') {
         updateFlashcards();
+        keyboard.show(); // Show keyboard for practice tabs
+    } else {
+        keyboard.hide(); // Hide keyboard for config tab
     }
 }
 
@@ -560,18 +643,35 @@ function updateFlashcards() {
     if (letterManager && wordManager) {
         letterManager.updateItems(randomSeed);
         wordManager.updateItems(randomSeed);
-        letterManager.renderFlashcard();
-        wordManager.renderFlashcard();
+
+        // Only render the flashcard for the currently active tab
+        const activeScreen = document.querySelector('.screen.active');
+        if (activeScreen && activeScreen.id === 'letter-screen') {
+            letterManager.renderFlashcard();
+        } else if (activeScreen && activeScreen.id === 'word-screen') {
+            wordManager.renderFlashcard();
+        } else {
+            // Default to letters if no active screen found
+            letterManager.renderFlashcard();
+        }
     }
 }
 
 // Legacy wrapper functions for backward compatibility
 function updateLetterFlashcard() {
-    if (letterManager) letterManager.renderFlashcard();
+    if (letterManager) {
+        // Clear any existing keyboard setup before rendering new flashcard
+        keyboard.reset();
+        letterManager.renderFlashcard();
+    }
 }
 
 function updateWordFlashcard() {
-    if (wordManager) wordManager.renderFlashcard();
+    if (wordManager) {
+        // Clear any existing keyboard setup before rendering new flashcard
+        keyboard.reset();
+        wordManager.renderFlashcard();
+    }
 }
 
 function getAvailableLetters() {
@@ -601,13 +701,7 @@ function showWordAnswer() {
     if (wordManager) wordManager.showAnswer();
 }
 
-function nextLetter() {
-    if (letterManager) letterManager.next();
-}
-
-function nextWord() {
-    if (wordManager) wordManager.next();
-}
+// Removed nextLetter and nextWord functions - no longer needed
 
 function showMultipleChoice() {
     if (letterManager) letterManager.showMultipleChoice();
